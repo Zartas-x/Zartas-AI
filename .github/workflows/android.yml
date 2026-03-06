@@ -10,7 +10,7 @@ jobs:
       - name: Set up Python
         uses: actions/setup-python@v5
         with:
-          python-version: '3.11.14'
+          python-version: '3.11'
 
       - name: Install dependencies
         run: |
@@ -21,15 +21,21 @@ jobs:
 
       - name: Build with Buildozer
         run: |
-          # 1. Создаем пустую папку для конфигов Android
-          mkdir -p ~/.android && touch ~/.android/repositories.cfg
+          # 1. Явно указываем путь к Java (это решает 90% проблем)
+          export JAVA_HOME=$JAVA_HOME_17_X64
           
-          # 2. Магия: запускаем сборку и автоматически отвечаем 'y' на все вопросы SDK
-          # Мы используем pexpect-подобный подход через yes
-          yes | buildozer -v android debug
+          # 2. Инициализируем buildozer
+          buildozer android help
+          
+          # 3. Принимаем лицензии ДО основной сборки
+          # Создаем файл-заглушку, который говорит Google "всё подписано"
+          mkdir -p ~/.buildozer/android/platform/android-sdk/licenses
+          echo -e "8933bad161af4178b1185d1a37fbf41ea5269c55\nd56f5187479451eabf01fb7437c302a91464830a\n263b06347e830d3411994339384198357994f811" > ~/.buildozer/android/platform/android-sdk/licenses/android-sdk-license
+          
+          # 4. Запускаем сборку
+          buildozer -v android debug
           
       - name: Upload APK
-        if: success()
         uses: actions/upload-artifact@v4
         with:
           name: Zartas-Installer
