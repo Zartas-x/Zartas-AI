@@ -21,21 +21,15 @@ jobs:
 
       - name: Build with Buildozer
         run: |
-          # 1. Инициализируем buildozer (создаем папки)
-          buildozer android help || true
-          
-          # 2. Прямое принятие лицензий через sdkmanager
-          # Мы заходим в папку, куда buildozer скачал SDK, и подписываем всё
+          # 1. Создаем пустую папку для конфигов Android
           mkdir -p ~/.android && touch ~/.android/repositories.cfg
-          export SDK_PATH=$(buildozer android dump | grep "ANDROIDSDK=" | cut -d'=' -f2 | xargs)
-          if [ -d "$SDK_PATH" ]; then
-            yes | $SDK_PATH/tools/bin/sdkmanager --licenses || true
-          fi
           
-          # 3. Запуск основной сборки. Добавляем --profile для надежности
-          buildozer -v android debug
+          # 2. Магия: запускаем сборку и автоматически отвечаем 'y' на все вопросы SDK
+          # Мы используем pexpect-подобный подход через yes
+          yes | buildozer -v android debug
           
       - name: Upload APK
+        if: success()
         uses: actions/upload-artifact@v4
         with:
           name: Zartas-Installer
