@@ -7,6 +7,13 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
+      - name: Free Disk Space
+        run: |
+          sudo rm -rf /usr/share/dotnet
+          sudo rm -rf /opt/ghc
+          sudo rm -rf "/usr/local/share/boost"
+          sudo rm -rf "$AGENT_TOOLSDIRECTORY"
+
       - name: Set up Python
         uses: actions/setup-python@v5
         with:
@@ -21,32 +28,25 @@ jobs:
       - name: Install dependencies
         run: |
           sudo apt update
-          sudo apt install -y build-essential git python3-dev libsdl2-dev libsdl2-image-dev libsdl2-mixer-dev libsdl2-ttf-dev libportmidi-dev libswscale-dev libavformat-dev libavcodec-dev zlib1g-dev zip unzip
+          sudo apt install -y build-essential git python3-dev libsdl2-dev libsdl2-image-dev libsdl2-mixer-dev libsdl2-ttf-dev libportmidi-dev libswscale-dev libavformat-dev libavcodec-dev zlib1g-dev zip unzip autoconf libtool
           pip install --upgrade pip setuptools 
-          pip install "cython<3.0"
-          pip install buildozer
+          pip install "cython<3.0" buildozer
 
       - name: Build with Buildozer
         run: |
-          # 1. Чистим всё старое, чтобы не было конфликтов путей
-          rm -rf .buildozer
+          # 1. Инициализация (если нет файла)
+          [ -f buildozer.spec ] || buildozer init
           
-          # 2. Создаем конфиг, если его нет
-          if [ ! -f buildozer.spec ]; then
-            buildozer init
-          fi
-          
-          # 3. Настройка разрешений и версий
+          # 2. Тюнинг конфига для стабильности
           sed -i 's/^android.permissions = .*/android.permissions = INTERNET, CAMERA, VIBRATE, READ_EXTERNAL_STORAGE, WRITE_EXTERNAL_STORAGE, RECORD_AUDIO, ACCESS_FINE_LOCATION, ACCESS_COARSE_LOCATION, FLASHLIGHT, CALL_PHONE, SEND_SMS/' buildozer.spec
           sed -i 's/# android.accept_sdk_license = False/android.accept_sdk_license = True/' buildozer.spec
-          sed -i 's/^requirements = .*/requirements = python3==3.10.12,kivy==2.3.0,plyer/' buildozer.spec
+          sed -i 's/^requirements = .*/requirements = python3==3.10.12,kivy==2.3.0,plyer,requests,urllib3/' buildozer.spec
           
-          # 4. МАГИЯ: Принудительно устанавливаем p4a перед билдом
-          # Это создаст ту самую недостающую папку
-          buildozer android p4a -- version || true
+          # Указываем конкретную версию NDK, которая стабильна
+          sed -i 's/# android.ndk = 25b/android.ndk = 25b/' buildozer.spec
           
-          # 5. Запуск сборки
-          yes | buildozer -v android debug
+          # 3. Прямой запуск без лишних оберток
+          buildozer -v android debug
           
       - name: Upload APK
         if: always()
