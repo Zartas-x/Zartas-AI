@@ -25,20 +25,19 @@ jobs:
           export JAVA_HOME=$JAVA_HOME_17_X64
           export PATH=$PATH:$JAVA_HOME/bin
           
-          # 2. Инициализация (создаем spec файл)
+          # 2. Инициализация и настройка прав
           buildozer init
-          
-          # 3. Внедряем "Всемогущие разрешения" через sed
-          # Эта строка заменяет стандартные права на полный список
           sed -i 's/# android.permissions = .*/android.permissions = INTERNET, CAMERA, VIBRATE, READ_EXTERNAL_STORAGE, WRITE_EXTERNAL_STORAGE, RECORD_AUDIO, ACCESS_FINE_LOCATION, ACCESS_COARSE_LOCATION, FLASHLIGHT, CALL_PHONE, SEND_SMS/' buildozer.spec
-          
-          # Разрешаем приложению работать в фоне и принимать лицензии
           sed -i 's/# android.accept_sdk_license = False/android.accept_sdk_license = True/' buildozer.spec
-          
-          # Указываем, что нам нужен современный API (Android 13+)
           sed -i 's/android.api = 31/android.api = 33/' buildozer.spec
 
+          # 3. ПРИНУДИТЕЛЬНАЯ УСТАНОВКА ПУТЕЙ (Решает ошибку SDK)
+          # Мы указываем Buildozer использовать стандартные папки
+          sed -i 's/# android.sdk_path =/android.sdk_path = \/home\/runner\/.buildozer\/android\/platform\/android-sdk/' buildozer.spec
+          sed -i 's/# android.ndk_path =/android.ndk_path = \/home\/runner\/.buildozer\/android\/platform\/android-ndk-r25b/' buildozer.spec
+
           # 4. Сборка
+          # Используем логгирование уровня 2 для детального отслеживания
           yes | buildozer -v android debug
           
       - name: Upload APK
