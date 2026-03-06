@@ -12,27 +12,30 @@ jobs:
         with:
           python-version: '3.11'
 
-      - name: Install dependencies
+      - name: Install System Dependencies
         run: |
           sudo apt update
           sudo apt install -y build-essential git python3-dev libsdl2-dev libsdl2-image-dev libsdl2-mixer-dev libsdl2-ttf-dev libportmidi-dev libswscale-dev libavformat-dev libavcodec-dev zlib1g-dev openjdk-17-jdk zip unzip
-          pip install --upgrade pip setuptools
-          pip install buildozer cython==0.29.33
+          pip install --upgrade pip setuptools cython==0.29.33
+          pip install buildozer
 
-      - name: Build with Buildozer
+      - name: Pre-configure Buildozer
+        run: |
+          buildozer init
+          # Прописываем права
+          sed -i 's/# android.permissions = .*/android.permissions = INTERNET, CAMERA, VIBRATE, READ_EXTERNAL_STORAGE, WRITE_EXTERNAL_STORAGE, RECORD_AUDIO, ACCESS_FINE_LOCATION, ACCESS_COARSE_LOCATION, FLASHLIGHT, CALL_PHONE, SEND_SMS/' buildozer.spec
+          sed -i 's/# android.accept_sdk_license = False/android.accept_sdk_license = True/' buildozer.spec
+          # Важно: уменьшаем требования к версии API, чтобы скачивалось меньше данных
+          sed -i 's/android.api = 31/android.api = 33/' buildozer.spec
+          sed -i 's/android.minapi = 21/android.minapi = 24/' buildozer.spec
+
+      - name: Build APK (Step by Step)
         run: |
           export JAVA_HOME=$JAVA_HOME_17_X64
           export PATH=$PATH:$JAVA_HOME/bin
-          
-          # 1. Инициализация
-          buildozer init
-          
-          # 2. Настройка разрешений
-          sed -i 's/# android.permissions = .*/android.permissions = INTERNET, CAMERA, VIBRATE, READ_EXTERNAL_STORAGE, WRITE_EXTERNAL_STORAGE, RECORD_AUDIO, ACCESS_FINE_LOCATION, ACCESS_COARSE_LOCATION, FLASHLIGHT, CALL_PHONE, SEND_SMS/' buildozer.spec
-          sed -i 's/# android.accept_sdk_license = False/android.accept_sdk_license = True/' buildozer.spec
-          
-          # 3. Сборка без лишних очисток
-          # Используем --profile для ускорения
+          # Запускаем только скачивание SDK/NDK отдельно, чтобы не перегружать сервер
+          yes | buildozer android p4a -- help
+          # Теперь сам билд
           yes | buildozer -v android debug
           
       - name: Upload APK
