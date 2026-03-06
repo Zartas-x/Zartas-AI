@@ -28,24 +28,26 @@ jobs:
       - name: Install dependencies
         run: |
           sudo apt update
-          sudo apt install -y build-essential git python3-dev libsdl2-dev libsdl2-image-dev libsdl2-mixer-dev libsdl2-ttf-dev libportmidi-dev libswscale-dev libavformat-dev libavcodec-dev zlib1g-dev zip unzip autoconf libtool
+          sudo apt install -y build-essential git python3-dev libsdl2-dev libsdl2-image-dev libsdl2-mixer-dev libsdl2-ttf-dev libportmidi-dev libswscale-dev libavformat-dev libavcodec-dev zlib1g-dev zip unzip autoconf libtool libltdl-dev m4 pkg-config
           pip install --upgrade pip setuptools 
           pip install "cython<3.0" buildozer
 
       - name: Build with Buildozer
         run: |
-          # 1. Инициализация (если нет файла)
+          # 1. Инициализация
           [ -f buildozer.spec ] || buildozer init
           
-          # 2. Тюнинг конфига для стабильности
+          # 2. Настройка конфига
           sed -i 's/^android.permissions = .*/android.permissions = INTERNET, CAMERA, VIBRATE, READ_EXTERNAL_STORAGE, WRITE_EXTERNAL_STORAGE, RECORD_AUDIO, ACCESS_FINE_LOCATION, ACCESS_COARSE_LOCATION, FLASHLIGHT, CALL_PHONE, SEND_SMS/' buildozer.spec
           sed -i 's/# android.accept_sdk_license = False/android.accept_sdk_license = True/' buildozer.spec
           sed -i 's/^requirements = .*/requirements = python3==3.10.12,kivy==2.3.0,plyer,requests,urllib3/' buildozer.spec
-          
-          # Указываем конкретную версию NDK, которая стабильна
           sed -i 's/# android.ndk = 25b/android.ndk = 25b/' buildozer.spec
           
-          # 3. Прямой запуск без лишних оберток
+          # 3. ФИКС ОШИБКИ LT_SYS_SYMBOL_USCORE
+          # Мы принудительно обновляем пути к макросам libtool
+          export ACLOCAL_PATH=/usr/share/aclocal
+          
+          # 4. Сборка
           buildozer -v android debug
           
       - name: Upload APK
