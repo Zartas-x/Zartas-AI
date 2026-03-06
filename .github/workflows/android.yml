@@ -1,24 +1,39 @@
 name: Build APK
 on: [push]
+
 jobs:
   build:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+
       - name: Set up Python
         uses: actions/setup-python@v5
         with:
           python-version: '3.11.14'
-      - name: Install deps
+
+      - name: Install dependencies
         run: |
           sudo apt update
-          sudo apt install -y build-essential git python3-dev libsdl2-dev libsdl2-image-dev libsdl2-mixer-dev libsdl2-ttf-dev libportmidi-dev libswscale-dev libavformat-dev libavcodec-dev zlib1g-dev
+          sudo apt install -y build-essential git python3-dev libsdl2-dev libsdl2-image-dev libsdl2-mixer-y dev libsdl2-ttf-dev libportmidi-dev libswscale-dev libavformat-dev libavcodec-dev zlib1g-dev openjdk-17-jdk
           pip install --upgrade pip setuptools
           pip install buildozer cython==0.29.33
-      - name: Build
+
+      - name: Build with Buildozer
         run: |
-          yes | buildozer android debug
-      - name: Upload
+          # 1. Создаем папку для настроек SDK
+          mkdir -p ~/.android && touch ~/.android/repositories.cfg
+          
+          # 2. Предварительно генерируем конфиг buildozer, чтобы появились папки
+          buildozer android help || true
+          
+          # 3. Принимаем все лицензии Android (самый важный шаг)
+          yes | buildozer android signatures || true
+          
+          # 4. Запускаем чистую сборку
+          buildozer -v android debug
+          
+      - name: Upload APK
         uses: actions/upload-artifact@v4
         with:
           name: Zartas-Installer
