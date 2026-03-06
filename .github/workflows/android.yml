@@ -21,23 +21,24 @@ jobs:
 
       - name: Build with Buildozer
         run: |
-          # 1. Настройка окружения
+          # 1. Настройка путей Java
           export JAVA_HOME=$JAVA_HOME_17_X64
           export PATH=$PATH:$JAVA_HOME/bin
           
-          # 2. Инициализация (если файла нет)
+          # 2. Создание buildozer.spec если его нет
           if [ ! -f buildozer.spec ]; then
             buildozer init
+            # Немного подправим созданный конфиг, чтобы он точно сработал
+            sed -i 's/# android.accept_sdk_license = False/android.accept_sdk_license = True/' buildozer.spec
           fi
 
-          # 3. КРИТИЧЕСКИЙ МОМЕНТ: 
-          # Мы используем 'yes', чтобы отвечать на вопросы внутри самого процесса сборки.
-          # Также отключаем попытки Buildozer использовать старый путь к лицензиям.
+          # 3. Запуск основной сборки
+          # 'yes' автоматически нажмет "y" на всех лицензиях Android SDK
           yes | buildozer -v android debug
           
       - name: Upload APK
         if: success()
         uses: actions/upload-artifact@v4
         with:
-          name: Zartas-Installer
+          name: My-Zartas-App
           path: bin/*.apk
