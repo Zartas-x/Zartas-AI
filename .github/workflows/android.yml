@@ -15,22 +15,22 @@ jobs:
       - name: Install dependencies
         run: |
           sudo apt update
-          sudo apt install -y build-essential git python3-dev libsdl2-dev libsdl2-image-dev libsdl2-mixer-y dev libsdl2-ttf-dev libportmidi-dev libswscale-dev libavformat-dev libavcodec-dev zlib1g-dev openjdk-17-jdk
+          sudo apt install -y build-essential git python3-dev libsdl2-dev libsdl2-image-dev libsdl2-mixer-dev libsdl2-ttf-dev libportmidi-dev libswscale-dev libavformat-dev libavcodec-dev zlib1g-dev openjdk-17-jdk
           pip install --upgrade pip setuptools
           pip install buildozer cython==0.29.33
 
       - name: Build with Buildozer
         run: |
-          # 1. Создаем папку для настроек SDK
+          # Создаем необходимые директории
           mkdir -p ~/.android && touch ~/.android/repositories.cfg
           
-          # 2. Предварительно генерируем конфиг buildozer, чтобы появились папки
+          # Предварительный запуск для инициализации папок SDK
           buildozer android help || true
           
-          # 3. Принимаем все лицензии Android (самый важный шаг)
+          # Принимаем все лицензии Android SDK (критично для облака)
           yes | buildozer android signatures || true
           
-          # 4. Запускаем чистую сборку
+          # Запуск основной сборки с подробным выводом
           buildozer -v android debug
           
       - name: Upload APK
