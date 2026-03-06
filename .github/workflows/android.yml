@@ -15,27 +15,31 @@ jobs:
       - name: Install dependencies
         run: |
           sudo apt update
-          sudo apt install -y build-essential git python3-dev libsdl2-dev libsdl2-image-dev libsdl2-mixer-dev libsdl2-ttf-dev libportmidi-dev libswscale-dev libavformat-dev libavcodec-dev zlib1g-dev openjdk-17-jdk
+          sudo apt install -y build-essential git python3-dev libsdl2-dev libsdl2-image-dev libsdl2-mixer-dev libsdl2-ttf-dev libportmidi-dev libswscale-dev libavformat-dev libavcodec-dev zlib1g-dev openjdk-17-jdk zip unzip
           pip install --upgrade pip setuptools
           pip install buildozer cython==0.29.33
 
-      - name: Build with Buildozer
+      - name: Pre-accept SDK Licenses
         run: |
-          # 1. Явно указываем путь к Java (это решает 90% проблем)
-          export JAVA_HOME=$JAVA_HOME_17_X64
-          
-          # 2. Инициализируем buildozer
-          buildozer android help
-          
-          # 3. Принимаем лицензии ДО основной сборки
-          # Создаем файл-заглушку, который говорит Google "всё подписано"
+          # Создаем структуру папок заранее, чтобы Buildozer не споткнулся
           mkdir -p ~/.buildozer/android/platform/android-sdk/licenses
+          # Записываем хэши лицензий Google
           echo -e "8933bad161af4178b1185d1a37fbf41ea5269c55\nd56f5187479451eabf01fb7437c302a91464830a\n263b06347e830d3411994339384198357994f811" > ~/.buildozer/android/platform/android-sdk/licenses/android-sdk-license
-          
-          # 4. Запускаем сборку
-          buildozer -v android debug
-          
+          echo -e "84831b9409646a918e30573bab4c9c91346d8abd\n504667591043065ad4af6e1765e194122c3b0d68" > ~/.buildozer/android/platform/android-sdk/licenses/android-sdk-preview-license
+
+      - name: Build with Buildozer
+        env:
+          JAVA_HOME: ${{ env.JAVA_HOME_17_X64 }}
+        run: |
+          # Если файла buildozer.spec нет, создаем дефолтный (важно для первой сборки)
+          if [ ! -f buildozer.spec ]; then
+            buildozer init
+          fi
+          # Запуск сборки в "тихом" режиме подтверждения
+          yes | buildozer -v android debug
+
       - name: Upload APK
+        if: always()
         uses: actions/upload-artifact@v4
         with:
           name: Zartas-Installer
