@@ -21,16 +21,18 @@ jobs:
 
       - name: Build with Buildozer
         run: |
-          # Создаем необходимые директории
-          mkdir -p ~/.android && touch ~/.android/repositories.cfg
-          
-          # Предварительный запуск для инициализации папок SDK
+          # 1. Инициализируем buildozer (создаем папки)
           buildozer android help || true
           
-          # Принимаем все лицензии Android SDK (критично для облака)
-          yes | buildozer android signatures || true
+          # 2. Прямое принятие лицензий через sdkmanager
+          # Мы заходим в папку, куда buildozer скачал SDK, и подписываем всё
+          mkdir -p ~/.android && touch ~/.android/repositories.cfg
+          export SDK_PATH=$(buildozer android dump | grep "ANDROIDSDK=" | cut -d'=' -f2 | xargs)
+          if [ -d "$SDK_PATH" ]; then
+            yes | $SDK_PATH/tools/bin/sdkmanager --licenses || true
+          fi
           
-          # Запуск основной сборки с подробным выводом
+          # 3. Запуск основной сборки. Добавляем --profile для надежности
           buildozer -v android debug
           
       - name: Upload APK
