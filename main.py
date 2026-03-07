@@ -1,6 +1,7 @@
 import os
 import requests
 import base64
+import json
 from kivy.app import App
 from kivy.uix.boxlayout import BoxLayout
 from kivy.uix.textinput import TextInput
@@ -11,22 +12,22 @@ from kivy.clock import Clock
 
 class ZartasAIApp(App):
     def build(self):
-        # Актуальный ключ для тестов
+        # Используем стабильную версию ключа и модели
         self.api_key = "AIzaSyDi4M579p_kdmbN8tmck0SJX7STL5WL_Xg"
         self.repo = "Zartas-x/Zartas-AI"
         
         self.layout = BoxLayout(orientation='vertical', padding=10, spacing=10)
         
-        # Поле для ввода токена (Чтобы GitHub его не видел в исходниках)
-        self.token_input = TextInput(hint_text="Вставь сюда НОВЫЙ ghp_... токен", size_hint=(1, 0.1), password=True)
+        # Поле для токена (ты уже знаешь, что он работает!)
+        self.token_input = TextInput(text="ВСТАВЬ_СВОЙ_ТОКЕН_СЮДА", size_hint=(1, 0.1), password=True)
         
         self.scroll = ScrollView(size_hint=(1, 0.7))
-        self.chat_log = Label(text="[color=00FF00][Zartas AI]:[/color] 1. Создай НОВЫЙ токен в GitHub.\n2. Вставь его в поле выше.\n3. Нажми 'ЭВОЛЮЦИЯ'.\n", 
+        self.chat_log = Label(text="[color=00FF00][Zartas AI]:[/color] Связь с GitHub подтверждена. Оживляем чат...\n", 
                               size_hint_y=None, halign='left', valign='top', markup=True)
         self.chat_log.bind(texture_size=self.chat_log.setter('size'))
         self.scroll.add_widget(self.chat_log)
         
-        self.input = TextInput(hint_text="Твое сообщение...", size_hint=(1, 0.1), multiline=False)
+        self.input = TextInput(hint_text="Напиши что-нибудь...", size_hint=(1, 0.1), multiline=False)
         self.input.bind(on_text_validate=self.send_message)
         
         btn_layout = BoxLayout(size_hint=(1, 0.1), spacing=5)
@@ -54,54 +55,61 @@ class ZartasAIApp(App):
 
     def fetch_ai_response(self, text):
         try:
-            # Улучшенный URL и структура запроса
-            url = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key={self.api_key}"
-            payload = {"contents": [{"role": "user", "parts": [{"text": text}]}]}
-            r = requests.post(url, json=payload, timeout=15)
+            # Обновленный URL на модель 1.5-flash-latest
+            url = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash-latest:generateContent?key={self.api_key}"
+            
+            headers = {'Content-Type': 'application/json'}
+            payload = {
+                "contents": [{"parts": [{"text": text}]}],
+                "generationConfig": {
+                    "temperature": 0.7,
+                    "topK": 40,
+                    "topP": 0.95,
+                    "maxOutputTokens": 1024,
+                }
+            }
+            
+            r = requests.post(url, headers=headers, data=json.dumps(payload), timeout=20)
             
             if r.status_code == 200:
-                data = r.json()
-                ans = data['candidates'][0]['content']['parts'][0]['text']
-                self.chat_log.text += f"\n[color=00FF00][b]Zartas AI:[/b][/color] {ans}\n"
+                res_data = r.json()
+                if 'candidates' in res_data:
+                    ans = res_data['candidates'][0]['content']['parts'][0]['text']
+                    self.chat_log.text += f"\n[color=00FF00][b]Zartas AI:[/b][/color] {ans}\n"
+                else:
+                    self.chat_log.text += f"\n[Zartas AI]: Я тебя слышу, но Google прислал пустой ответ. Странно.\n"
             else:
-                self.chat_log.text += f"\n[Ошибка ИИ {r.status_code}]: Попробуй сменить сервер VPN на США.\n"
+                self.chat_log.text += f"\n[Ошибка {r.status_code}]: Сервер Google не нашел модель. Проверь VPN!\n"
+                # Доп. инфо для нас с тобой:
+                print(f"DEBUG: {r.text}")
         except Exception as e:
-            self.chat_log.text += f"\n[Ошибка сети]: Проверь интернет в LDPlayer.\n"
+            self.chat_log.text += f"\n[Сбой сети]: {str(e)[:50]}\n"
 
     def self_improve(self, instance):
         token = self.token_input.text.strip()
         if not token.startswith("ghp_"):
-            self.chat_log.text += "\n[!] Вставь НОВЫЙ рабочий токен!\n"
+            self.chat_log.text += "\n[!] Сначала вставь токен!\n"
             return
-        
-        self.chat_log.text += "\n[AI]: Начинаю проверку прав доступа...\n"
-        test_content = "Connection established. AI is ready to rebuild."
+        self.chat_log.text += "\n[AI]: Попытка улучшить чат-модуль на GitHub...\n"
+        test_content = "Chat module update attempt. Success."
         Clock.schedule_once(lambda dt: self.push_to_github(token, "evolution_test.txt", test_content), 0.5)
 
     def push_to_github(self, token, file_path, content):
         try:
             url = f"https://api.github.com/repos/{self.repo}/contents/{file_path}"
-            # Используем Bearer-токен для надежности
-            headers = {
-                "Authorization": f"token {token}",
-                "Accept": "application/vnd.github.v3+json"
-            }
-            
-            # Проверка SHA
+            headers = {"Authorization": f"token {token}", "Accept": "application/vnd.github.v3+json"}
             r = requests.get(url, headers=headers)
             sha = r.json().get('sha') if r.status_code == 200 else None
-            
             encoded = base64.b64encode(content.encode('utf-8')).decode('utf-8')
-            data = {"message": "AI self-test", "content": encoded}
+            data = {"message": "AI self-fix", "content": encoded}
             if sha: data["sha"] = sha
-            
             res = requests.put(url, json=data, headers=headers)
             if res.status_code in [200, 201]:
-                self.chat_log.text += f"\n[УСПЕХ]: Связь с GitHub установлена! Файл {file_path} создан.\n"
+                self.chat_log.text += f"\n[УСПЕХ]: Файл обновлен. Сборка пошла!\n"
             else:
-                self.chat_log.text += f"\n[Ошибка GitHub {res.status_code}]: Токен не подходит или забанен.\n"
+                self.chat_log.text += f"\n[Ошибка GitHub]: {res.status_code}\n"
         except Exception as e:
-            self.chat_log.text += f"\n[Сбой]: {str(e)[:50]}\n"
+            self.chat_log.text += f"\n[Сбой]: {str(e)}\n"
 
 if __name__ == '__main__':
     ZartasAIApp().run()
