@@ -1,31 +1,28 @@
 [app]
-title = Zartas AI
-package.name = zartas
+title = Zartas AI Ultra
+package.name = zartasai
 package.domain = org.zartas
 source.dir = .
 source.include_exts = py,png,jpg,kv,atlas
 version = 0.1
 
-# Важно: эти версии идеально подходят под сервер GitHub
-requirements = python3==3.11.14,kivy==2.3.0,hostpython3==3.11.14
+# БИБЛИОТЕКИ (Добавляем Plyer и Pyjnius для управления железом)
+requirements = python3,kivy==2.3.0,plyer,pyjnius,requests,urllib3
 
 orientation = portrait
 fullscreen = 1
+android.archs = arm64-v8a, armeabi-v7a
+android.allow_backup = True
 
-# Разрешения для работы ИИ
-android.permissions = INTERNET, WRITE_EXTERNAL_STORAGE, READ_EXTERNAL_STORAGE
+# ПРАВА (Разрешаем звонить, снимать и лезть в файлы)
+android.permissions = INTERNET, CALL_PHONE, SEND_SMS, READ_CONTACTS, WRITE_CONTACTS, CAMERA, RECORD_AUDIO, ACCESS_FINE_LOCATION, READ_EXTERNAL_STORAGE, WRITE_EXTERNAL_STORAGE, VIBRATE
 
+android.sdk = 33
+android.ndk = 25b
 android.api = 33
 android.minapi = 21
-android.ndk = 25b
-android.skip_update = False
 android.accept_sdk_license = True
-android.archs = arm64-v8a, armeabi-v7a
-
-# Включаем подробный лог, чтобы видеть ошибки
-log_level = 2
 
 [buildozer]
 log_level = 2
-build_dir = ./.buildozer
-bin_dir = ./bin
+warn_on_root = 1
