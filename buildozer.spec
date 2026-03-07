@@ -1,21 +1,21 @@
 [app]
-title = Zartas AI Ultra
+title = Zartas AI
 package.name = zartasai
 package.domain = org.zartas
 source.dir = .
 source.include_exts = py,png,jpg,kv,atlas
 version = 0.1
 
-# БИБЛИОТЕКИ (Добавляем Plyer и Pyjnius для управления железом)
-requirements = python3,kivy==2.3.0,plyer,pyjnius,requests,urllib3
+# ВАЖНО: Добавил все зависимости для интернета и управления
+requirements = python3,kivy==2.3.0,requests,urllib3,chardet,idna,certifi,plyer,pyjnius
 
 orientation = portrait
 fullscreen = 1
 android.archs = arm64-v8a, armeabi-v7a
 android.allow_backup = True
 
-# ПРАВА (Разрешаем звонить, снимать и лезть в файлы)
-android.permissions = INTERNET, CALL_PHONE, SEND_SMS, READ_CONTACTS, WRITE_CONTACTS, CAMERA, RECORD_AUDIO, ACCESS_FINE_LOCATION, READ_EXTERNAL_STORAGE, WRITE_EXTERNAL_STORAGE, VIBRATE
+# ПРАВА: Интернет + Управление + Железо
+android.permissions = INTERNET, ACCESS_NETWORK_STATE, CALL_PHONE, CAMERA, VIBRATE, READ_EXTERNAL_STORAGE, WRITE_EXTERNAL_STORAGE
 
 android.sdk = 33
 android.ndk = 25b
