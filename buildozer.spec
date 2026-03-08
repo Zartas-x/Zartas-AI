@@ -14,10 +14,11 @@ source.dir = .
 # (list) Source files to include
 source.include_exts = py,png,jpg,kv,atlas
 
-# (str) Application version (ВАЖНО: МЫ ДОБАВИЛИ ЭТУ СТРОКУ)
+# (str) Application version
 version = 0.1
 
 # (list) Application requirements
+# ВАЖНО: Все библиотеки для работы сети
 requirements = python3,kivy,requests,urllib3,chardet,certifi,idna
 
 # (str) Supported orientations
@@ -31,6 +32,13 @@ android.api = 33
 
 # (int) Minimum API
 android.minapi = 21
+
+# (int) Android SDK version to use
+android.sdk = 33
+
+# (str) Android build-tools version to use
+# ВАЖНО: Фиксируем стабильную версию, чтобы не было ошибки лицензии
+android.build_tools_version = 33.0.0
 
 # (bool) Use architectures
 android.archs = arm64-v8a, armeabi-v7a
