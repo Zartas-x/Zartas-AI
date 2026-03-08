@@ -12,12 +12,22 @@ class ZartasAIApp(App):
         self.api_input = TextInput(hint_text="Вставь API Key", size_hint=(1, 0.1), password=True)
         
         self.scroll = ScrollView(size_hint=(1, 0.8))
-        self.chat_log = Label(text="[color=00FF00][Zartas AI]:[/color] Версия 10.0. Исправлен путь к модели. Теперь точно взлетим!\n", 
-                              size_hint_y=None, halign='left', valign='top', markup=True)
+        
+        # ТУТ МАГИЯ: добавили тексту границы
+        self.chat_log = Label(
+            text="[color=00FF00][Zartas AI]:[/color] Версия 10.5. Теперь текст не убежит!\n", 
+            size_hint_y=None, 
+            markup=True,
+            halign='left',
+            valign='top'
+        )
+        # Эта строка заставляет текст переноситься по словам
+        self.chat_log.bind(width=lambda instance, value: setattr(instance, 'text_size', (value, None)))
         self.chat_log.bind(texture_size=self.chat_log.setter('size'))
+        
         self.scroll.add_widget(self.chat_log)
         
-        self.input = TextInput(hint_text="Напиши 'Привет'...", size_hint=(1, 0.1), multiline=False)
+        self.input = TextInput(hint_text="Напиши что-нибудь...", size_hint=(1, 0.1), multiline=False)
         self.input.bind(on_text_validate=self.send_message)
         
         self.layout.add_widget(self.api_input)
@@ -34,14 +44,10 @@ class ZartasAIApp(App):
         Clock.schedule_once(lambda dt: self.fetch_ai_response(user_text, key), 0.1)
 
     def fetch_ai_response(self, text, key):
-        # ИСПОЛЬЗУЕМ ПРЯМОЙ И САМЫЙ НАДЕЖНЫЙ URL БЕЗ ЛИШНИХ ПРИСТАВОК
         url = f"https://generativelanguage.googleapis.com/v1/models/gemini-1.5-flash:generateContent?key={key}"
-        
         try:
-            self.chat_log.text += "\n[Система]: Пробую пробиться..."
             session = requests.Session()
             session.trust_env = False 
-            
             payload = {"contents": [{"parts": [{"text": text}]}]}
             r = session.post(url, json=payload, timeout=15)
             
@@ -49,7 +55,6 @@ class ZartasAIApp(App):
                 ans = r.json()['candidates'][0]['content']['parts'][0]['text']
                 self.chat_log.text += f"\n[color=00FF00][b]Zartas AI:[/b][/color] {ans}\n"
             else:
-                # Если опять ошибка - выводим её полностью
                 self.chat_log.text += f"\n[Ошибка {r.status_code}]: {r.text}\n"
         except Exception as e:
             self.chat_log.text += f"\n[Сбой]: {str(e)}\n"
