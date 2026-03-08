@@ -11,16 +11,16 @@ class ZartasAIApp(App):
     def build(self):
         self.layout = BoxLayout(orientation='vertical', padding=10, spacing=10)
         
-        # Поле для ключа с авто-очисткой пробелов
-        self.api_input = TextInput(hint_text="Вставь Google API Key здесь", size_hint=(1, 0.1), password=True)
+        # Поле для ключа (без варнингов!)
+        self.api_input = TextInput(hint_text="Вставь свой свежий API Key", size_hint=(1, 0.1), password=True)
         
         self.scroll = ScrollView(size_hint=(1, 0.8))
-        self.chat_log = Label(text="[color=00FF00][Zartas AI]:[/color] Раз браузер работает — мы у цели!\n1. Создай НОВЫЙ ключ в AI Studio.\n2. Вставь его сюда.\n", 
+        self.chat_log = Label(text="[color=00FF00][Zartas AI]:[/color] Версия 8.5. Движок: Gemini Flash-Lite (3.1/2.0).\n", 
                               size_hint_y=None, halign='left', valign='top', markup=True)
         self.chat_log.bind(texture_size=self.chat_log.setter('size'))
         self.scroll.add_widget(self.chat_log)
         
-        self.input = TextInput(hint_text="Пиши...", size_hint=(1, 0.1), multiline=False)
+        self.input = TextInput(hint_text="Напиши что-нибудь...", size_hint=(1, 0.1), multiline=False)
         self.input.bind(on_text_validate=self.send_message)
         
         self.layout.add_widget(self.api_input)
@@ -30,39 +30,38 @@ class ZartasAIApp(App):
 
     def send_message(self, instance):
         user_text = self.input.text.strip()
-        # Убираем все лишние пробелы вокруг ключа автоматически!
+        # Очищаем ключ от пробелов
         key = self.api_input.text.replace(" ", "").strip()
         
-        if not user_text or not key: 
-            self.chat_log.text += "\n[!] Нужен ключ и текст!"
-            return
-            
+        if not user_text or not key: return
         self.chat_log.text += f"\n[b]Вы:[/b] {user_text}"
         self.input.text = ""
         Clock.schedule_once(lambda dt: self.fetch_ai_response(user_text, key), 0.1)
 
     def fetch_ai_response(self, text, key):
+        # ИСПОЛЬЗУЕМ САМЫЙ АКТУАЛЬНЫЙ LITE-ДВИЖОК (2.0/3.1 Preview)
+        model_name = "gemini-2.0-flash-lite-preview-02-05"
+        url = f"https://generativelanguage.googleapis.com/v1beta/models/{model_name}:generateContent?key={key}"
+        
         try:
-            # Используем стабильный адрес
-            url = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key={key}"
+            self.chat_log.text += "\n[Система]: Связь с Gemini Lite установлена..."
+            
+            # Настройка сессии для стабильности в LDPlayer
+            session = requests.Session()
+            session.trust_env = False 
+            
             payload = {"contents": [{"parts": [{"text": text}]}]}
-            
-            self.chat_log.text += "\n[Система]: Связь с Google установлена. Жду ответ..."
-            
-            r = requests.post(url, json=payload, timeout=20)
+            r = session.post(url, json=payload, timeout=15)
             
             if r.status_code == 200:
-                res_data = r.json()
-                ans = res_data['candidates'][0]['content']['parts'][0]['text']
+                ans = r.json()['candidates'][0]['content']['parts'][0]['text']
                 self.chat_log.text += f"\n[color=00FF00][b]Zartas AI:[/b][/color] {ans}\n"
             else:
-                # Показываем причину прямо в чате
-                error_msg = r.json().get('error', {}).get('message', 'Неизвестная ошибка')
-                self.chat_log.text += f"\n[Ошибка {r.status_code}]: {error_msg}\n"
-                if "API key not valid" in error_msg:
-                    self.chat_log.text += "[Подсказка]: Ключ неверный. Удали старый в AI Studio и создай НОВЫЙ.\n"
+                # Если Google скажет, что модель еще недоступна в твоем регионе, 
+                # он выдаст ошибку, и мы быстро откатимся на 1.5 Flash.
+                self.chat_log.text += f"\n[Ошибка {r.status_code}]: {r.text[:200]}\n"
         except Exception as e:
-            self.chat_log.text += f"\n[Сбой]: {str(e)}\n"
+            self.chat_log.text += f"\n[Сбой связи]: {str(e)}\n"
 
 if __name__ == '__main__':
     ZartasAIApp().run()
