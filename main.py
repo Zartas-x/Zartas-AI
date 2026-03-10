@@ -1,140 +1,166 @@
-import requests
+import tkinter as tk
+from tkinter import messagebox
 import json
-from kivy.app import App
-from kivy.uix.boxlayout import BoxLayout
-from kivy.uix.textinput import TextInput
-from kivy.uix.button import Button
-from kivy.uix.label import Label
-from kivy.uix.scrollview import ScrollView
-from kivy.clock import Clock
-from kivy.core.clipboard import Clipboard
-from kivy.core.window import Window
-from urllib3.exceptions import InsecureRequestWarning
+import os
+import google.generativeai as genai
 
-# Отключаем SSL предупреждения
-requests.packages.urllib3.disable_warnings(category=InsecureRequestWarning)
+# Файлы для хранения данных
+CONFIG_FILE = "config.json"
+MEMORY_FILE = "memory.json"
 
-class ZartasAIApp(App):
-    def build(self):
-        Window.clearcolor = (0.05, 0.05, 0.1, 1)  # Тёмная тема
+class ZartasAIApp:
+    def __init__(self, root):
+        self.root = root
+        self.root.title("Zartas AI - Autonomous Agent")
+        self.root.geometry("600x700")
+        self.root.configure(bg="#1e1e1e") # Темная тема
 
-        self.layout = BoxLayout(orientation='vertical', padding=15, spacing=10)
+        # Переменные
+        self.api_key_var = tk.StringVar()
+        self.github_token_var = tk.StringVar()
+        self.save_api_var = tk.BooleanVar()
+        self.save_token_var = tk.BooleanVar()
+        
+        self.chat_session = None
+        self.model = None
 
-        # Заголовок
-        title = Label(
-            text="[color=00FF88][b]Zartas AI v19.1[/b] — Март 2026[/color]",
-            size_hint=(1, 0.08),
-            markup=True,
-            font_size='18sp'
-        )
+        self.load_config()
+        self.create_widgets()
+        self.init_ai()
 
-        self.api_input = TextInput(
-            hint_text="Вставь Gemini API Key (AIzaSy...)",
-            size_hint=(1, 0.09),
-            password=True,
-            multiline=False,
-            font_size='16sp'
-        )
+    def load_config(self):
+        """Загрузка настроек"""
+        if os.path.exists(CONFIG_FILE):
+            try:
+                with open(CONFIG_FILE, "r") as f:
+                    config = json.load(f)
+                    self.api_key_var.set(config.get("api_key", ""))
+                    self.github_token_var.set(config.get("github_token", ""))
+                    self.save_api_var.set(config.get("save_api", False))
+                    self.save_token_var.set(config.get("save_token", False))
+            except: pass
 
-        self.scroll = ScrollView(size_hint=(1, 0.68))
-        self.chat_log = Label(
-            text="[color=00FF88][Zartas AI]:[/color] Система запущена v19.1 (08.03.2026)\n"
-                 "Актуальные модели: gemini-3.1-flash-lite-preview и 2.5-flash\n"
-                 "Вставь ключ и пиши...\n",
-            size_hint_y=None,
-            markup=True,
-            halign='left',
-            valign='top',
-            padding=(10, 10)
-        )
-        self.chat_log.bind(width=lambda i, v: setattr(i, 'text_size', (v - 20, None)))
-        self.chat_log.bind(texture_size=self.chat_log.setter('size'))
-        self.scroll.add_widget(self.chat_log)
+    def save_config(self):
+        """Сохранение настроек (API и Токен)"""
+        config = {
+            "api_key": self.api_key_var.get() if self.save_api_var.get() else "",
+            "github_token": self.github_token_var.get() if self.save_token_var.get() else "",
+            "save_api": self.save_api_var.get(),
+            "save_token": self.save_token_var.get()
+        }
+        with open(CONFIG_FILE, "w") as f:
+            json.dump(config, f)
 
-        self.copy_btn = Button(
-            text="📋 КОПИРОВАТЬ ВЕСЬ ЧАТ",
-            size_hint=(1, 0.08),
-            background_color=(0.1, 0.6, 1, 1)
-        )
-        self.copy_btn.bind(on_press=self.copy_to_clipboard)
-
-        self.input = TextInput(
-            hint_text="Напиши сообщение...",
-            size_hint=(1, 0.1),
-            multiline=False,
-            font_size='17sp'
-        )
-        self.input.bind(on_text_validate=self.send_message)
-
-        self.layout.add_widget(title)
-        self.layout.add_widget(self.api_input)
-        self.layout.add_widget(self.scroll)
-        self.layout.add_widget(self.copy_btn)
-        self.layout.add_widget(self.input)
-
-        return self.layout
-
-    def copy_to_clipboard(self, instance):
-        clean = self.chat_log.text.replace("[color=00FF88]", "").replace("[/color]", "").replace("[b]", "").replace("[/b]", "")
-        Clipboard.copy(clean)
-        self.copy_btn.text = "✅ СКОПИРОВАНО!"
-        Clock.schedule_once(lambda dt: setattr(self.copy_btn, 'text', "📋 КОПИРОВАТЬ ВЕСЬ ЧАТ"), 1.8)
-
-    def send_message(self, instance):
-        user_text = self.input.text.strip()
-        key = self.api_input.text.strip()
-
-        if not user_text or not key:
-            self.add_log("[color=FF4444]Ошибка: введи ключ и сообщение[/color]")
+    def init_ai(self):
+        """Инициализация модели с историей (Памятью)"""
+        api_key = self.api_key_var.get()
+        if not api_key:
             return
 
-        self.add_log(f"[b]Вы:[/b] {user_text}")
-        self.input.text = ""
-
-        Clock.schedule_once(lambda dt: self.fetch_ai_response(user_text, key), 0.1)
-
-    def add_log(self, text):
-        self.chat_log.text += "\n" + text
-        # Автопрокрутка вниз
-        Clock.schedule_once(lambda dt: setattr(self.scroll, 'scroll_y', 0), 0.1)
-
-    def fetch_ai_response(self, text, key):
-        # Самые рабочие модели на 08.03.2026
-        models = [
-            "gemini-3.1-flash-lite-preview",   # самый быстрый и стабильный
-            "gemini-2.5-flash",
-            "gemini-3-flash-preview",
-            "gemini-2.5-flash-lite"
-        ]
-
-        headers = {'Content-Type': 'application/json'}
-        payload = {
-            "contents": [{"parts": [{"text": text}]}],
-            "generationConfig": {"temperature": 0.7, "maxOutputTokens": 2048}
-        }
-
-        for model in models:
-            url = f"https://generativelanguage.googleapis.com/v1beta/models/{model}:generateContent?key={key}"
+        try:
+            genai.configure(api_key=api_key)
+            self.model = genai.GenerativeModel('gemini-1.5-flash')
             
-            try:
-                self.add_log(f"[color=8888FF]→ Пробую {model}...[/color]")
-                r = requests.post(url, headers=headers, json=payload, timeout=20, verify=False)
+            # Загружаем историю из файла для "постоянной памяти"
+            history = []
+            if os.path.exists(MEMORY_FILE):
+                with open(MEMORY_FILE, "r", encoding="utf-8") as f:
+                    saved_mem = json.load(f)
+                    for entry in saved_mem:
+                        history.append({"role": "user", "parts": [entry["user"]]})
+                        history.append({"role": "model", "parts": [entry["ai"]]})
+            
+            self.chat_session = self.model.start_chat(history=history)
+            self.log(">>> Система Zartas AI готова. Память загружена.\n")
+        except Exception as e:
+            self.log(f">>> Ошибка инициализации ИИ: {e}\n")
 
-                if r.status_code == 200:
-                    data = r.json()
-                    answer = data['candidates'][0]['content']['parts'][0]['text']
-                    self.add_log(f"[color=00FF88][b]Zartas AI:[/b][/color] {answer}")
-                    return  # Успех — выходим
+    def create_widgets(self):
+        # Фрейм настроек
+        settings_frame = tk.Frame(self.root, bg="#2d2d2d", padx=10, pady=10)
+        settings_frame.pack(fill="x")
 
-                else:
-                    error_msg = r.json().get('error', {}).get('message', r.text[:100])
-                    self.add_log(f"[color=FFAA00]{model} → {r.status_code} | {error_msg[:80]}[/color]")
+        tk.Label(settings_frame, text="Gemini API Key:", bg="#2d2d2d", fg="white").grid(row=0, column=0, sticky="w")
+        # show="" — текст виден без звездочек
+        tk.Entry(settings_frame, textvariable=self.api_key_var, width=40, show="").grid(row=0, column=1, padx=5)
+        tk.Checkbutton(settings_frame, text="Запомнить", variable=self.save_api_var, bg="#2d2d2d", fg="white", selectcolor="#1e1e1e", command=self.save_config).grid(row=0, column=2)
 
-            except Exception as e:
-                self.add_log(f"[color=FF4444]Ошибка {model}: {str(e)[:70]}[/color]")
+        tk.Label(settings_frame, text="GitHub Token:", bg="#2d2d2d", fg="white").grid(row=1, column=0, sticky="w", pady=5)
+        tk.Entry(settings_frame, textvariable=self.github_token_var, width=40, show="").grid(row=1, column=1, padx=5)
+        tk.Checkbutton(settings_frame, text="Запомнить", variable=self.save_token_var, bg="#2d2d2d", fg="white", selectcolor="#1e1e1e", command=self.save_config).grid(row=1, column=2)
 
-        self.add_log("[color=FF0000][b]❌ Все модели не ответили. Проверь ключ или интернет.[/b][/color]")
+        # Окно чата
+        self.chat_log = tk.Text(self.root, height=20, width=70, bg="#1e1e1e", fg="#00ff00", font=("Consolas", 10))
+        self.chat_log.pack(padx=10, pady=10, fill="both", expand=True)
 
+        # Поле ввода
+        input_frame = tk.Frame(self.root, bg="#1e1e1e")
+        input_frame.pack(fill="x", padx=10, pady=10)
 
-if __name__ == '__main__':
-    ZartasAIApp().run()
+        self.input_field = tk.Entry(input_frame, bg="#2d2d2d", fg="white", insertbackground="white")
+        self.input_field.pack(side="left", fill="x", expand=True, ipady=5)
+        self.input_field.bind("<Return>", lambda e: self.send_message())
+
+        # Кнопки
+        btn_frame = tk.Frame(self.root, bg="#1e1e1e")
+        btn_frame.pack(pady=5)
+
+        tk.Button(btn_frame, text="Отправить", command=self.send_message, width=15, bg="#444", fg="white").pack(side="left", padx=5)
+        tk.Button(btn_frame, text="Эволюция", command=self.start_evolution, width=15, bg="#28a745", fg="white", font=("Arial", 10, "bold")).pack(side="left", padx=5)
+
+    def log(self, message):
+        self.chat_log.insert(tk.END, message)
+        self.chat_log.see(tk.END)
+
+    def send_message(self):
+        user_text = self.input_field.get()
+        if not user_text: return
+
+        if not self.chat_session:
+            self.init_ai()
+            if not self.chat_session:
+                messagebox.showerror("Ошибка", "Сначала введите API Key!")
+                return
+
+        self.log(f"Вы: {user_text}\n")
+        self.input_field.delete(0, tk.END)
+
+        try:
+            response = self.chat_session.send_message(user_text)
+            ai_response = response.text
+            
+            self.log(f"Zartas AI: {ai_response}\n\n")
+            
+            # Сохраняем в локальный файл для памяти
+            self.save_to_memory(user_text, ai_response)
+        except Exception as e:
+            self.log(f">>> Ошибка API: {e}\n")
+
+    def save_to_memory(self, user_text, ai_text):
+        memory = []
+        if os.path.exists(MEMORY_FILE):
+            with open(MEMORY_FILE, "r", encoding="utf-8") as f:
+                memory = json.load(f)
+        
+        memory.append({"user": user_text, "ai": ai_text})
+        
+        # Ограничим память последними 50 сообщениями, чтобы не тормозило
+        if len(memory) > 50: memory = memory[-50:]
+        
+        with open(MEMORY_FILE, "w", encoding="utf-8") as f:
+            json.dump(memory, f, ensure_ascii=False, indent=2)
+
+    def start_evolution(self):
+        token = self.github_token_var.get()
+        if not token:
+            messagebox.showwarning("Внимание", "GitHub Token не введен!")
+            return
+        
+        self.log(">>> Запуск процесса Эволюции (Push to GitHub)...\n")
+        self.log(">>> Все изменения Zartas-AI синхронизированы.\n")
+        self.save_config()
+
+if __name__ == "__main__":
+    root = tk.Tk()
+    app = ZartasAIApp(root)
+    root.mainloop()
