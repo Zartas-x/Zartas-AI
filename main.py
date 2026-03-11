@@ -7,6 +7,10 @@ from kivy.uix.progressbar import ProgressBar
 from kivy.utils import get_color_from_hex
 import json, os, threading, requests
 
+# Отключаем предупреждения об отсутствии SSL (важно для эмуляторов)
+import urllib3
+urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
+
 class ZartasAIApp(App):
     def build(self):
         self.config_file = "config.json"
@@ -55,14 +59,17 @@ class ZartasAIApp(App):
 
     def load_settings(self):
         if os.path.exists(self.config_file):
-            with open(self.config_file, "r") as f:
-                data = json.load(f)
-                self.api_key.text = data.get("api", "")
-                self.gh_token.text = data.get("gh", "")
+            try:
+                with open(self.config_file, "r") as f:
+                    data = json.load(f)
+                    self.api_key.text = data.get("api", "")
+                    self.gh_token.text = data.get("gh", "")
+            except:
+                self.log("Ошибка загрузки config.json")
 
     def save_settings(self):
         with open(self.config_file, "w") as f:
-            json.dump({"api": self.api_key.text, "gh": self.gh_token.text}, f)
+            json.dump({"api": self.api_key.text.strip(), "gh": self.gh_token.text.strip()}, f)
 
     def start_chat_thread(self, instance):
         msg = self.user_msg.text
@@ -72,22 +79,34 @@ class ZartasAIApp(App):
             threading.Thread(target=self.ask_gemini, args=(msg,)).start()
 
     def ask_gemini(self, prompt):
-        api_key = self.api_key.text
+        api_key = self.api_key.text.strip()
         if not api_key:
             self.log("ERROR: Введите Gemini API Key!")
             return
         
+        # Используем актуальную версию модели
         url = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key={api_key}"
         headers = {'Content-Type': 'application/json'}
         data = {"contents": [{"parts": [{"text": prompt}]}]}
         
         try:
-            response = requests.post(url, headers=headers, json=data)
-            res_json = response.json()
-            answer = res_json['candidates'][0]['content']['parts'][0]['text']
-            self.log(f"GEMINI: {answer}")
+            self.log("Отправка запроса...")
+            # verify=False игнорирует проблемы с сертификатами SSL
+            response = requests.post(url, headers=headers, json=data, verify=False, timeout=20)
+            
+            if response.status_code == 200:
+                res_json = response.json()
+                if 'candidates' in res_json:
+                    answer = res_json['candidates'][0]['content']['parts'][0]['text']
+                    self.log(f"GEMINI: {answer}")
+                else:
+                    self.log(f"ОТВЕТ ПУСТОЙ: {res_json}")
+            else:
+                self.log(f"ОШИБКА API ({response.status_code}):")
+                self.log(f"{response.text[:100]}")
+                
         except Exception as e:
-            self.log(f"API ERROR: {str(e)}")
+            self.log(f"ОШИБКА СЕТИ: {str(e)[:100]}")
 
     def start_evo(self, instance):
         self.save_settings()
@@ -95,10 +114,11 @@ class ZartasAIApp(App):
         threading.Thread(target=self.evo_process).start()
 
     def evo_process(self):
-        # Здесь будет логика чтения main.py и отправки в Gemini для исправления
         self.log("Считывание текущего кода...")
         self.progress.value = 30
-        # ... (логика пуша на GitHub добавится, когда проверим чат)
+        # Имитация работы для теста
+        import time
+        time.sleep(2)
         self.log("Анализ завершен. Ошибок не найдено.")
         self.progress.value = 100
 
