@@ -6,7 +6,9 @@ source.dir = .
 source.include_exts = py,png,jpg,kv,atlas
 version = 0.1
 
-requirements = python3,kivy,requests,urllib3,chardet,certifi,idna
+requirements = python3,hostpython3,requests,urllib3,chardet,certifi,idna
+# ВАЖНО: Если сборка упадет на tkinter, заменим на Kivy позже, 
+# но пока пробуем оживить твой код 19.1
 
 orientation = portrait
 android.permissions = INTERNET, ACCESS_NETWORK_STATE
