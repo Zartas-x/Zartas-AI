@@ -1,9 +1,9 @@
-name: Build Zartas-AI Ultra
+name: Build Zartas-AI 19.1
 on: [push]
 
 jobs:
   build:
-    runs-on: ubuntu-22.04  # Используем 22.04, она стабильнее для Buildozer
+    runs-on: ubuntu-22.04
     steps:
       - uses: actions/checkout@v4
 
@@ -26,25 +26,14 @@ jobs:
 
       - name: Build with Buildozer
         run: |
-          # Полная очистка перед стартом
-          rm -rf .buildozer
-          [ -f buildozer.spec ] || buildozer init
-          
-          # Настройка конфига
-          sed -i 's/^android.permissions = .*/android.permissions = INTERNET, CAMERA, VIBRATE, READ_EXTERNAL_STORAGE, WRITE_EXTERNAL_STORAGE, RECORD_AUDIO, ACCESS_FINE_LOCATION, ACCESS_COARSE_LOCATION, FLASHLIGHT, CALL_PHONE, SEND_SMS/' buildozer.spec
-          sed -i 's/# android.accept_sdk_license = False/android.accept_sdk_license = True/' buildozer.spec
-          # Фикс требований: добавляем только необходимое
-          sed -i 's/^requirements = .*/requirements = python3,kivy==2.3.0,plyer,requests/' buildozer.spec
-          
-          # ЗАПРЕЩАЕМ использовать системные пути (лечит твои 20 ошибок)
+          # Мы не трогаем buildozer.spec через sed! 
+          # Он будет использоваться ровно так, как ты его настроишь.
           export CPATH=""
           export LIBRARY_PATH=""
-          
           buildozer -v android debug
-          
+
       - name: Upload APK
-        if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: Zartas-AI-Final-APK
+          name: Zartas-AI-19.1-APK
           path: bin/*.apk
